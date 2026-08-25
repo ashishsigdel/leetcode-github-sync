@@ -58,7 +58,7 @@ language, runtime and memory. No copy-paste, no third-party server, no account t
 ### Option B — from source
 
 ```bash
-git clone https://github.com/<your-username>/leetcode-github-sync.git
+git clone https://github.com/ashishsigdel/leetcode-github-sync.git
 ```
 
 Then follow steps 3–5 above, selecting the cloned folder.
@@ -82,8 +82,8 @@ The extension's settings page has a **How to get?** button that walks through th
 1. Go to [github.com/settings/personal-access-tokens/new](https://github.com/settings/personal-access-tokens/new).
 2. **Token name:** anything recognisable, e.g. `leetcode-sync`.
 3. **Expiration:** your choice. When it expires, syncing stops until you paste in a new token.
-4. **Repository access:** *Only select repositories* → pick your solutions repo.
-5. **Permissions** → *Repository permissions* → **Contents: Read and write**.
+4. **Repository access:** _Only select repositories_ → pick your solutions repo.
+5. **Permissions** → _Repository permissions_ → **Contents: Read and write**.
    That is the only permission needed.
 6. **Generate token** and copy it. GitHub shows it only once.
 
@@ -97,7 +97,7 @@ The extension's settings page has a **How to get?** button that walks through th
 
 ## What lands in your repo
 
-Solve *Two Sum* in Python and you get:
+Solve _Two Sum_ in Python and you get:
 
 ```
 your-repo/
@@ -123,19 +123,19 @@ Commits are messaged `Add solution: <problem title>` and `Add README: <problem t
 
 ## Supported languages
 
-| Language | File | Language | File |
-| --- | --- | --- | --- |
-| Python / Python3 | `.py` | Rust | `.rs` |
-| Java | `.java` | Ruby | `.rb` |
-| C++ | `.cpp` | Scala | `.scala` |
-| C | `.c` | Racket | `.rkt` |
-| C# | `.cs` | Erlang | `.erl` |
-| JavaScript | `.js` | Elixir | `.ex` |
-| TypeScript | `.ts` | Dart | `.dart` |
-| PHP | `.php` | Bash | `.sh` |
-| Swift | `.swift` | Pandas | `.py` |
-| Kotlin | `.kt` | MySQL / MS SQL / Oracle / PostgreSQL | `.sql` |
-| Go | `.go` | *anything else* | `.txt` |
+| Language         | File     | Language                             | File     |
+| ---------------- | -------- | ------------------------------------ | -------- |
+| Python / Python3 | `.py`    | Rust                                 | `.rs`    |
+| Java             | `.java`  | Ruby                                 | `.rb`    |
+| C++              | `.cpp`   | Scala                                | `.scala` |
+| C                | `.c`     | Racket                               | `.rkt`   |
+| C#               | `.cs`    | Erlang                               | `.erl`   |
+| JavaScript       | `.js`    | Elixir                               | `.ex`    |
+| TypeScript       | `.ts`    | Dart                                 | `.dart`  |
+| PHP              | `.php`   | Bash                                 | `.sh`    |
+| Swift            | `.swift` | Pandas                               | `.py`    |
+| Kotlin           | `.kt`    | MySQL / MS SQL / Oracle / PostgreSQL | `.sql`   |
+| Go               | `.go`    | _anything else_                      | `.txt`   |
 
 ## Privacy and security
 
@@ -158,15 +158,15 @@ you can audit it in one sitting.
 Open the extension popup. The **Activity** list shows how far the pipeline got, and you can filter it
 to just **Failed** events.
 
-| What you see | What it means |
-| --- | --- |
-| Nothing at all | The page hook never ran. **Reload the LeetCode tab** — a tab opened before you installed or reloaded the extension is still running the old code. |
-| `Submission detected` but no commit | Interception works. Either the submission wasn't accepted, or the commit failed — check the error banner. |
-| `Commit failed: 404 Not Found` | Wrong owner/repo, or the token isn't scoped to that repository. |
-| `Commit failed: 401` / `403` | Token is invalid, expired, or missing `Contents: Read and write`. |
-| `Commit failed: 409` / `422` | The branch in settings doesn't exist. A brand-new repo has no `main` branch until its first commit. |
-| `No code captured` | LeetCode changed its submit payload shape and the editor fallback also came up empty. Please open an issue. |
-| Nothing syncs after a Chrome update | Reload the extension at `chrome://extensions`, then reload your LeetCode tab. |
+| What you see                        | What it means                                                                                                                                     |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Nothing at all                      | The page hook never ran. **Reload the LeetCode tab** — a tab opened before you installed or reloaded the extension is still running the old code. |
+| `Submission detected` but no commit | Interception works. Either the submission wasn't accepted, or the commit failed — check the error banner.                                         |
+| `Commit failed: 404 Not Found`      | Wrong owner/repo, or the token isn't scoped to that repository.                                                                                   |
+| `Commit failed: 401` / `403`        | Token is invalid, expired, or missing `Contents: Read and write`.                                                                                 |
+| `Commit failed: 409` / `422`        | The branch in settings doesn't exist. A brand-new repo has no `main` branch until its first commit.                                               |
+| `No code captured`                  | LeetCode changed its submit payload shape and the editor fallback also came up empty. Please open an issue.                                       |
+| Nothing syncs after a Chrome update | Reload the extension at `chrome://extensions`, then reload your LeetCode tab.                                                                     |
 
 For lower-level detail, open DevTools on the LeetCode tab and filter the console for `[LC2GH]` —
 every intercepted request is logged there.
@@ -175,12 +175,12 @@ every intercepted request is logged there.
 
 Four small files, each with one job:
 
-| File | Role |
-| --- | --- |
-| `inject.js` | Runs in the LeetCode page's own JS context. Wraps `fetch` and `XMLHttpRequest` to observe the submit and result-polling calls the page already makes. Never touches your token. |
-| `content.js` | Runs in the extension's isolated world. Adds the human-readable problem title from the DOM and relays the event to the background worker. |
-| `background.js` | The only file that talks to GitHub. Reads the token from storage and calls the GitHub Contents API directly. |
-| `popup.html` / `options.html` | Activity log and settings. |
+| File                          | Role                                                                                                                                                                            |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `inject.js`                   | Runs in the LeetCode page's own JS context. Wraps `fetch` and `XMLHttpRequest` to observe the submit and result-polling calls the page already makes. Never touches your token. |
+| `content.js`                  | Runs in the extension's isolated world. Adds the human-readable problem title from the DOM and relays the event to the background worker.                                       |
+| `background.js`               | The only file that talks to GitHub. Reads the token from storage and calls the GitHub Contents API directly.                                                                    |
+| `popup.html` / `options.html` | Activity log and settings.                                                                                                                                                      |
 
 A couple of deliberate design notes:
 
