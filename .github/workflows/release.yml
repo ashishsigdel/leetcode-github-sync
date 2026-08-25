@@ -1,0 +1,25 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  zip:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build extension ZIP
+        run: |
+          zip -r leetcode-github-sync.zip . \
+            -x '.git/*' '.github/*' '*.DS_Store' '*.zip' 'docs/*'
+
+      - name: Attach ZIP to the release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: leetcode-github-sync.zip
+          generate_release_notes: true

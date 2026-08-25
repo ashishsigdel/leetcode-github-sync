@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>LeetCode → GitHub Sync</title>
+<style>
+  /* ---- Design tokens (GitHub Primer-derived, light) ---- */
+  :root {
+    --canvas:        #ffffff;
+    --canvas-subtle: #f6f8fa;
+    --canvas-inset:  #f6f8fa;
+    --border:        #d1d9e0;
+    --border-muted:  #e4e8ed;
+    --fg:            #1f2328;
+    --fg-muted:      #59636e;
+    --fg-subtle:     #818b98;
+    --accent:        #0969da;
+    --success:       #1a7f37;
+    --danger:        #cf222e;
+    --attention:     #9a6700;
+    --shadow:        0 1px 3px rgba(31, 35, 40, .08);
+    --radius:        6px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --canvas:        #0d1117;
+      --canvas-subtle: #151b23;
+      --canvas-inset:  #010409;
+      --border:        #3d444d;
+      --border-muted:  #262c36;
+      --fg:            #f0f6fc;
+      --fg-muted:      #9198a1;
+      --fg-subtle:     #6e7681;
+      --accent:        #4493f8;
+      --success:       #3fb950;
+      --danger:        #f85149;
+      --attention:     #d29922;
+      --shadow:        0 1px 3px rgba(1, 4, 9, .5);
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    width: 380px;
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--fg);
+    background: var(--canvas);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .icon { flex: none; display: block; }
+  .icon path, .icon circle, .icon rect, .icon line {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .icon path.gear-teeth { stroke-width: 2.1; stroke-linecap: butt; }
+  /* Brand lockup: the two service logos joined by a link. Kept outside the
+     .icon stroke system since the logos are filled paths. */
+  .brand-lockup { display: block; flex: none; color: var(--fg); }
+  .brand-lockup .lc    { fill: #FFA116; stroke: none; }
+  .brand-lockup .gh    { fill: currentColor; stroke: none; }
+  .brand-lockup .chain {
+    fill: none;
+    stroke: var(--fg-subtle);
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  /* ---- Header ---- */
+  header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+    background: var(--canvas-subtle);
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    flex: 1;
+  }
+  .brand-name {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: -.01em;
+    white-space: nowrap;
+  }
+
+  .icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: var(--radius);
+    background: transparent;
+    color: var(--fg-muted);
+    cursor: pointer;
+  }
+  .icon-btn:hover { background: var(--border-muted); color: var(--fg); }
+  .icon-btn:active { background: var(--border); }
+  .icon-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+  /* ---- Status summary ---- */
+  .summary { padding: 12px 14px; border-bottom: 1px solid var(--border); }
+  .summary-line {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+  .dot {
+    flex: none;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--fg-subtle);
+  }
+  .dot.on  { background: var(--success); }
+  .dot.off { background: var(--danger); }
+
+  .repo {
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--accent);
+    text-decoration: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .repo:hover { text-decoration: underline; }
+  .repo-plain { font-weight: 600; font-size: 13px; }
+  #target { min-width: 0; display: flex; overflow: hidden; }
+
+  .badge {
+    flex: none;
+    margin-left: auto;
+    padding: 0 7px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 18px;
+    color: var(--fg-muted);
+    background: var(--canvas);
+  }
+
+  .meta {
+    margin: 6px 0 0;
+    padding-left: 16px;
+    font-size: 12px;
+    color: var(--fg-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .meta strong { font-weight: 600; color: var(--fg); }
+
+  /* ---- Error banner ---- */
+  .banner {
+    display: none;
+    gap: 8px;
+    margin: 12px 14px 0;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--danger);
+    border-radius: var(--radius);
+    background: var(--canvas-subtle);
+    font-size: 12px;
+  }
+  .banner.show { display: flex; }
+  .banner .icon { color: var(--danger); margin-top: 1px; }
+  .banner-body { min-width: 0; }
+  .banner-title { font-weight: 600; }
+  .banner-text {
+    margin-top: 1px;
+    color: var(--fg-muted);
+    word-break: break-word;
+  }
+
+  /* ---- Activity section ---- */
+  .section-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 14px 8px;
+  }
+  .section-title {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--fg-muted);
+  }
+  .filters {
+    display: flex;
+    gap: 2px;
+    margin-left: auto;
+    padding: 2px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--canvas-subtle);
+  }
+  .filter {
+    padding: 2px 8px;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    font: inherit;
+    font-size: 11px;
+    color: var(--fg-muted);
+    cursor: pointer;
+  }
+  .filter:hover { color: var(--fg); }
+  .filter[aria-selected="true"] {
+    background: var(--canvas);
+    color: var(--fg);
+    font-weight: 600;
+    box-shadow: var(--shadow);
+  }
+
+  #log {
+    max-height: 268px;
+    overflow-y: auto;
+    border-top: 1px solid var(--border-muted);
+  }
+  #log::-webkit-scrollbar { width: 10px; }
+  #log::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border: 3px solid var(--canvas);
+    border-radius: 999px;
+  }
+
+  .entry {
+    display: flex;
+    gap: 10px;
+    padding: 9px 14px;
+    border-bottom: 1px solid var(--border-muted);
+  }
+  .entry:last-child { border-bottom: 0; }
+  .entry:hover { background: var(--canvas-subtle); }
+
+  .entry-icon { margin-top: 1px; }
+  .entry-icon.is-success { color: var(--success); }
+  .entry-icon.is-error   { color: var(--danger); }
+  .entry-icon.is-warn    { color: var(--attention); }
+  .entry-icon.is-info    { color: var(--accent); }
+  .entry-icon.is-neutral { color: var(--fg-subtle); }
+
+  .entry-body { min-width: 0; flex: 1; }
+  .entry-label { font-weight: 600; font-size: 12px; }
+  .entry-detail {
+    margin-top: 1px;
+    font-size: 12px;
+    color: var(--fg-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .entry-detail.mono {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 11px;
+  }
+  .entry-time {
+    flex: none;
+    font-size: 11px;
+    color: var(--fg-subtle);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    margin-top: 1px;
+  }
+
+  /* ---- Blankslate ---- */
+  .blank {
+    padding: 28px 24px 32px;
+    text-align: center;
+    color: var(--fg-muted);
+  }
+  .blank .icon {
+    width: 24px;
+    height: 24px;
+    margin: 0 auto 10px;
+    color: var(--fg-subtle);
+  }
+  .blank-title { font-size: 13px; font-weight: 600; color: var(--fg); }
+  .blank-text { margin-top: 3px; font-size: 12px; }
+</style>
+</head>
+<body>
+  <header>
+    <span class="brand">
+      <!-- LeetCode → chain → GitHub lockup -->
+      <svg class="brand-lockup" width="47" height="16" viewBox="0 0 47 16" aria-hidden="true">
+        <g transform="scale(0.6667)"><path class="lc" d="M13.483 0a1.374 1.374 0 0 0-.961.438L7.116 6.226l-3.854 4.126a5.266 5.266 0 0 0-1.209 2.104 5.35 5.35 0 0 0-.125.513 5.527 5.527 0 0 0 .062 2.362 5.83 5.83 0 0 0 .349 1.017 5.938 5.938 0 0 0 1.271 1.818l4.277 4.193.039.038c2.248 2.165 5.852 2.133 8.063-.074l2.396-2.392c.54-.54.54-1.414.003-1.955a1.378 1.378 0 0 0-1.951-.003l-2.396 2.392a3.021 3.021 0 0 1-4.205.038l-.02-.019-4.276-4.193c-.652-.64-.972-1.469-.948-2.263a2.68 2.68 0 0 1 .066-.523 2.545 2.545 0 0 1 .619-1.164L9.13 8.114c1.058-1.134 3.204-1.27 4.43-.278l3.501 2.831c.593.48 1.461.387 1.94-.207a1.384 1.384 0 0 0-.207-1.943l-3.5-2.831c-.717-.579-1.545-.94-2.41-1.1l2.376-2.375a1.384 1.384 0 0 0 0-1.955A1.374 1.374 0 0 0 13.483 0zm-2.008 13.681a1.375 1.375 0 0 0-1.375 1.375c0 .759.616 1.375 1.375 1.375h10.483a1.375 1.375 0 0 0 0-2.75H11.475z" /></g>
+        <g transform="translate(17.5 2) scale(0.75)"><path class="chain" d="M6.4 9.6 9.6 6.4M7.4 4.6 8.9 3.1a2.9 2.9 0 0 1 4 4L11.4 8.6M8.6 11.4l-1.5 1.5a2.9 2.9 0 0 1-4-4L4.6 7.4" /></g>
+        <g transform="translate(31 0)"><path class="gh" d="M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.66-.21-2.17.82a7.61 7.61 0 0 0-4 0C6.53 3.1 5.87 3.31 5.87 3.31c-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z" /></g>
+      </svg>
+      <span class="brand-name">LeetCode → GitHub</span>
+    </span>
+    <button type="button" class="icon-btn" id="openOptions" title="Settings" aria-label="Settings">
+      <!-- gear: wide hub + short stubby teeth (a small hub with long spokes reads as a sun) -->
+      <svg class="icon" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+        <circle cx="8" cy="8" r="3.4" />
+        <path class="gear-teeth" d="M8 4.6V2.8M8 11.4v1.8M4.6 8H2.8M11.4 8h1.8M10.4 5.6l1.28-1.28M5.6 10.4l-1.28 1.28M5.6 5.6 4.32 4.32M10.4 10.4l1.28 1.28" />
+      </svg>
+    </button>
+  </header>
+
+  <section class="summary">
+    <div class="summary-line">
+      <span class="dot" id="dot"></span>
+      <span id="target" class="repo-plain">Checking…</span>
+      <span class="badge" id="stateBadge" hidden></span>
+    </div>
+    <p class="meta" id="lastSync"></p>
+  </section>
+
+  <div class="banner" id="banner">
+    <!-- alert triangle -->
+    <svg class="icon" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+      <path d="M8 2.25 14.75 13.5H1.25L8 2.25Z" />
+      <path d="M8 6.5v3.1" />
+      <circle cx="8" cy="11.6" r=".55" style="fill: currentColor" />
+    </svg>
+    <div class="banner-body">
+      <div class="banner-title">Last sync failed</div>
+      <div class="banner-text" id="bannerText"></div>
+    </div>
+  </div>
+
+  <div class="section-head">
+    <span class="section-title">Activity</span>
+    <div class="filters" role="tablist" aria-label="Filter activity">
+      <button class="filter" role="tab" data-filter="all"     aria-selected="true">All</button>
+      <button class="filter" role="tab" data-filter="success" aria-selected="false">Synced</button>
+      <button class="filter" role="tab" data-filter="error"   aria-selected="false">Failed</button>
+    </div>
+    <button type="button" class="icon-btn" id="clearLog" title="Clear activity" aria-label="Clear activity">
+      <!-- trash -->
+      <svg class="icon" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+        <path d="M2.75 4.5h10.5M6.25 4.5V3.4a.9.9 0 0 1 .9-.9h1.7a.9.9 0 0 1 .9.9v1.1M4.4 4.5l.55 8.1a1 1 0 0 0 1 .9h4.1a1 1 0 0 0 1-.9l.55-8.1" />
+      </svg>
+    </button>
+  </div>
+
+  <div id="log"></div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+# macOS
+.DS_Store
+._*
+
+# Build output
+*.zip
+*.crx
+*.pem
+
+# Editors
+.vscode/
+.idea/

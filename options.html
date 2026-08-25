@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>LeetCode → GitHub Sync — Settings</title>
+<style>
+  :root {
+    --canvas:        #ffffff;
+    --canvas-subtle: #f6f8fa;
+    --canvas-inset:  #f6f8fa;
+    --border:        #d1d9e0;
+    --border-muted:  #e4e8ed;
+    --fg:            #1f2328;
+    --fg-muted:      #59636e;
+    --fg-subtle:     #818b98;
+    --accent:        #0969da;
+    --success:       #1a7f37;
+    --success-btn:   #1f883d;
+    --success-btn-h: #1a7f37;
+    --danger:        #cf222e;
+    --attention:     #9a6700;
+    --shadow:        0 1px 0 rgba(31, 35, 40, .04);
+    --radius:        6px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --canvas:        #0d1117;
+      --canvas-subtle: #151b23;
+      --canvas-inset:  #010409;
+      --border:        #3d444d;
+      --border-muted:  #262c36;
+      --fg:            #f0f6fc;
+      --fg-muted:      #9198a1;
+      --fg-subtle:     #6e7681;
+      --accent:        #4493f8;
+      --success:       #3fb950;
+      --success-btn:   #238636;
+      --success-btn-h: #29903b;
+      --danger:        #f85149;
+      --attention:     #d29922;
+      --shadow:        0 1px 0 rgba(1, 4, 9, .2);
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    padding: 32px 16px 64px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--fg);
+    background: var(--canvas-inset);
+    -webkit-font-smoothing: antialiased;
+  }
+  .page { max-width: 620px; margin: 0 auto; }
+
+  .icon { flex: none; display: block; }
+  .icon path, .icon circle, .icon rect {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  /* ---- Page header ---- */
+  .page-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-bottom: 16px;
+    margin-bottom: 24px;
+    border-bottom: 1px solid var(--border);
+  }
+  /* Brand lockup: the two service logos joined by a link. Kept outside the
+     .icon stroke system since the logos are filled paths. */
+  .brand-lockup { display: block; flex: none; color: var(--fg); }
+  .brand-lockup .lc    { fill: #FFA116; stroke: none; }
+  .brand-lockup .gh    { fill: currentColor; stroke: none; }
+  .brand-lockup .chain {
+    fill: none;
+    stroke: var(--fg-subtle);
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  h1 { font-size: 20px; font-weight: 600; margin: 0; letter-spacing: -.01em; }
+  .page-sub { margin: 2px 0 0; font-size: 13px; color: var(--fg-muted); }
+
+  /* ---- Callout ---- */
+  .callout {
+    display: flex;
+    gap: 10px;
+    padding: 12px 14px;
+    margin-bottom: 20px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--canvas);
+    font-size: 13px;
+    color: var(--fg-muted);
+  }
+  .callout .icon { color: var(--fg-subtle); margin-top: 2px; }
+  .callout strong { color: var(--fg); font-weight: 600; }
+
+  /* ---- Box (section card) ---- */
+  .box {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--canvas);
+    box-shadow: var(--shadow);
+    margin-bottom: 20px;
+  }
+  .box-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--canvas-subtle);
+    border-radius: var(--radius) var(--radius) 0 0;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .box-body { padding: 16px; }
+  .box-footer {
+    padding: 10px 16px;
+    border-top: 1px solid var(--border-muted);
+    background: var(--canvas-subtle);
+    border-radius: 0 0 var(--radius) var(--radius);
+    font-size: 12px;
+    color: var(--fg-muted);
+  }
+
+  /* ---- Form fields ---- */
+  .field + .field { margin-top: 16px; }
+  .field label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .grid-2 .field + .field { margin-top: 0; }
+  /* Short values don't need the full row. */
+  .field-narrow input { max-width: 286px; }
+
+  input[type="text"], input[type="password"] {
+    width: 100%;
+    padding: 5px 12px;
+    font: inherit;
+    font-size: 14px;
+    line-height: 20px;
+    color: var(--fg);
+    background: var(--canvas);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  input::placeholder { color: var(--fg-subtle); }
+  input:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent);
+  }
+  .input-mono { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace; }
+
+  .input-group { position: relative; }
+  .input-group input { padding-right: 40px; }
+  .reveal {
+    position: absolute;
+    top: 1px;
+    right: 1px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 30px;
+    border: 0;
+    background: transparent;
+    color: var(--fg-muted);
+    border-radius: 0 var(--radius) var(--radius) 0;
+    cursor: pointer;
+  }
+  .reveal:hover { color: var(--fg); }
+  .reveal:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+  .caption { margin-top: 6px; font-size: 12px; color: var(--fg-muted); }
+  .caption a { color: var(--accent); text-decoration: none; }
+  .caption a:hover { text-decoration: underline; }
+  .caption code {
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: var(--canvas-subtle);
+    border: 1px solid var(--border-muted);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 11px;
+    color: var(--fg);
+  }
+
+  /* ---- Checkbox row ---- */
+  .check-row { display: flex; gap: 10px; align-items: flex-start; }
+  .check-row input[type="checkbox"] {
+    width: 15px;
+    height: 15px;
+    margin: 3px 0 0;
+    accent-color: var(--accent);
+    flex: none;
+  }
+  .check-row label { font-size: 14px; font-weight: 600; margin: 0; cursor: pointer; }
+  .check-row .caption { margin-top: 2px; }
+
+  /* ---- Destination preview ---- */
+  .preview-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--fg-subtle);
+  }
+  .tree {
+    margin: 6px 0 0;
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12px;
+    color: var(--fg-muted);
+    white-space: pre;
+    overflow-x: auto;
+  }
+  .tree b { color: var(--fg); font-weight: 600; }
+
+  /* ---- Actions ---- */
+  .actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 16px;
+    font: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 20px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: var(--canvas-subtle);
+    color: var(--fg);
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .btn:hover { background: var(--border-muted); }
+  .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .btn:disabled { opacity: .6; cursor: default; }
+  .btn-primary {
+    background: var(--success-btn);
+    border-color: color-mix(in srgb, #000 12%, var(--success-btn));
+    color: #ffffff;
+  }
+  .btn-primary:hover { background: var(--success-btn-h); }
+
+  /* ---- Ghost button (box-head actions) ---- */
+  .ghost-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 8px;
+    border: 1px solid transparent;
+    border-radius: var(--radius);
+    background: transparent;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--accent);
+    cursor: pointer;
+  }
+  .ghost-btn:hover { background: var(--canvas); border-color: var(--border); }
+  .ghost-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+  /* ---- Field-level security note ---- */
+  .note {
+    display: flex;
+    gap: 8px;
+    margin: 10px 0 0;
+    padding: 9px 11px;
+    border: 1px solid var(--border-muted);
+    border-left: 3px solid var(--attention);
+    border-radius: var(--radius);
+    background: var(--canvas-subtle);
+    font-size: 12px;
+    color: var(--fg-muted);
+  }
+  .note .icon { color: var(--attention); margin-top: 1px; }
+  .note strong { color: var(--fg); font-weight: 600; }
+  .note code {
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: var(--canvas);
+    border: 1px solid var(--border-muted);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 11px;
+    color: var(--fg);
+  }
+
+  /* ---- Modal (native <dialog>: free backdrop, Esc, focus trap) ---- */
+  .modal {
+    width: min(540px, calc(100vw - 32px));
+    max-height: calc(100vh - 48px);
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--canvas);
+    color: var(--fg);
+    box-shadow: 0 8px 32px rgba(1, 4, 9, .3);
+  }
+  .modal::backdrop { background: rgba(20, 24, 29, .55); }
+  /* Flex only while open — the UA sets display:none when closed. */
+  .modal[open] { display: flex; flex-direction: column; }
+  .modal-head, .modal-foot { flex: none; }
+  .modal-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .modal-head h2 { margin: 0; font-size: 15px; font-weight: 600; }
+  .modal-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    flex: none;
+    border: 1px solid transparent;
+    border-radius: var(--radius);
+    background: transparent;
+    color: var(--fg-muted);
+    cursor: pointer;
+  }
+  .modal-close:hover { background: var(--canvas-subtle); color: var(--fg); border-color: var(--border); }
+  .modal-body { padding: 16px; overflow-y: auto; }
+  .modal-intro { margin: 0 0 14px; font-size: 13px; color: var(--fg-muted); }
+
+  .steps { counter-reset: step; margin: 0; padding: 0; list-style: none; }
+  .steps li {
+    counter-increment: step;
+    position: relative;
+    padding-left: 30px;
+    margin-bottom: 12px;
+    font-size: 13px;
+    line-height: 1.55;
+  }
+  .steps li:last-child { margin-bottom: 0; }
+  .steps li::before {
+    content: counter(step);
+    position: absolute;
+    left: 0;
+    top: 1px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    background: var(--canvas-subtle);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--fg-muted);
+  }
+  .steps b { font-weight: 600; color: var(--fg); }
+  .steps code {
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: var(--canvas-subtle);
+    border: 1px solid var(--border-muted);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+  .steps a { color: var(--accent); text-decoration: none; }
+  .steps a:hover { text-decoration: underline; }
+
+  .modal-warn {
+    display: flex;
+    gap: 8px;
+    margin: 16px 0 0;
+    padding: 9px 11px;
+    border: 1px solid var(--border-muted);
+    border-left: 3px solid var(--attention);
+    border-radius: var(--radius);
+    background: var(--canvas-subtle);
+    font-size: 12px;
+    color: var(--fg-muted);
+  }
+  .modal-warn .icon { color: var(--attention); margin-top: 1px; }
+  .modal-foot {
+    display: flex;
+    gap: 8px;
+    padding: 12px 16px;
+    border-top: 1px solid var(--border);
+    background: var(--canvas-subtle);
+    border-radius: 0 0 8px 8px;
+  }
+
+  /* ---- Inline status ---- */
+  #status {
+    display: none;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--fg-muted);
+  }
+  #status.show { display: flex; }
+  #status.ok      { color: var(--success); }
+  #status.err     { color: var(--danger); }
+  #status.pending { color: var(--fg-muted); }
+  #status .icon.spin { animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) {
+    #status .icon.spin { animation-duration: 3s; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="page-head">
+<!-- LeetCode → chain → GitHub lockup -->
+    <svg class="brand-lockup" width="70" height="24" viewBox="0 0 47 16" aria-hidden="true">
+      <g transform="scale(0.6667)"><path class="lc" d="M13.483 0a1.374 1.374 0 0 0-.961.438L7.116 6.226l-3.854 4.126a5.266 5.266 0 0 0-1.209 2.104 5.35 5.35 0 0 0-.125.513 5.527 5.527 0 0 0 .062 2.362 5.83 5.83 0 0 0 .349 1.017 5.938 5.938 0 0 0 1.271 1.818l4.277 4.193.039.038c2.248 2.165 5.852 2.133 8.063-.074l2.396-2.392c.54-.54.54-1.414.003-1.955a1.378 1.378 0 0 0-1.951-.003l-2.396 2.392a3.021 3.021 0 0 1-4.205.038l-.02-.019-4.276-4.193c-.652-.64-.972-1.469-.948-2.263a2.68 2.68 0 0 1 .066-.523 2.545 2.545 0 0 1 .619-1.164L9.13 8.114c1.058-1.134 3.204-1.27 4.43-.278l3.501 2.831c.593.48 1.461.387 1.94-.207a1.384 1.384 0 0 0-.207-1.943l-3.5-2.831c-.717-.579-1.545-.94-2.41-1.1l2.376-2.375a1.384 1.384 0 0 0 0-1.955A1.374 1.374 0 0 0 13.483 0zm-2.008 13.681a1.375 1.375 0 0 0-1.375 1.375c0 .759.616 1.375 1.375 1.375h10.483a1.375 1.375 0 0 0 0-2.75H11.475z" /></g>
+      <g transform="translate(17.5 2) scale(0.75)"><path class="chain" d="M6.4 9.6 9.6 6.4M7.4 4.6 8.9 3.1a2.9 2.9 0 0 1 4 4L11.4 8.6M8.6 11.4l-1.5 1.5a2.9 2.9 0 0 1-4-4L4.6 7.4" /></g>
+      <g transform="translate(31 0)"><path class="gh" d="M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.66-.21-2.17.82a7.61 7.61 0 0 0-4 0C6.53 3.1 5.87 3.31 5.87 3.31c-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z" /></g>
+    </svg>
+    <div>
+      <h1>LeetCode → GitHub Sync</h1>
+      <p class="page-sub">Accepted submissions are committed to the repository you choose.</p>
+    </div>
+  </div>
+
+  <section class="box">
+    <div class="box-head">
+      <span>Authentication</span>
+      <button type="button" class="ghost-btn" id="howTo" aria-haspopup="dialog">
+        <svg class="icon" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
+          <circle cx="8" cy="8" r="6.25" />
+          <path d="M6.35 6.15a1.75 1.75 0 1 1 3.4.6c0 1.15-1.75 1.3-1.75 2.45" />
+          <circle cx="8" cy="11.6" r=".55" style="fill: currentColor" />
+        </svg>
+        How to get?
+      </button>
+    </div>
+    <div class="box-body">
+      <div class="field">
+        <label for="token">GitHub personal access token</label>
+        <div class="input-group">
+          <input type="password" id="token" class="input-mono" placeholder="github_pat_… or ghp_…"
+                 autocomplete="off" spellcheck="false" />
+          <button type="button" class="reveal" id="toggleToken" title="Show token" aria-label="Show token">
+            <svg class="icon" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M1.5 8S4 3.9 8 3.9 14.5 8 14.5 8 12 12.1 8 12.1 1.5 8 1.5 8Z" />
+              <circle cx="8" cy="8" r="1.9" />
+            </svg>
+          </button>
+        </div>
+        <p class="note">
+          <svg class="icon" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M4.75 7.25V5.5a3.25 3.25 0 0 1 6.5 0v1.75" />
+            <rect x="3.25" y="7.25" width="9.5" height="6" rx="1.25" />
+          </svg>
+          <span>
+            This token is stored <strong>only in this browser</strong> and is sent straight to
+            <code>api.github.com</code>. Nobody else can read it — not this extension's author,
+            not any other server. Treat it like a password and don't share your screen while it's visible.
+          </span>
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="box">
+    <div class="box-head">Destination</div>
+    <div class="box-body">
+      <div class="grid-2">
+        <div class="field">
+          <label for="owner">Owner</label>
+          <input type="text" id="owner" placeholder="octocat" autocomplete="off" spellcheck="false" />
+          <p class="caption">Your GitHub username or organization.</p>
+        </div>
+        <div class="field">
+          <label for="repo">Repository</label>
+          <input type="text" id="repo" placeholder="leetcode-solutions" autocomplete="off" spellcheck="false" />
+          <p class="caption">Must already exist on GitHub.</p>
+        </div>
+      </div>
+      <div class="field field-narrow">
+        <label for="branch">Branch</label>
+        <input type="text" id="branch" placeholder="main" autocomplete="off" spellcheck="false" />
+      </div>
+    </div>
+    <div class="box-footer">
+      <span class="preview-label">Where solutions will land</span>
+      <div class="tree" id="preview"></div>
+    </div>
+  </section>
+
+  <section class="box">
+    <div class="box-head">Commit options</div>
+    <div class="box-body">
+      <div class="check-row">
+        <input type="checkbox" id="includeReadme" />
+        <div>
+          <label for="includeReadme">Write a README.md for each problem</label>
+          <p class="caption">Adds the problem link, language, runtime, and memory alongside the solution.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <dialog class="modal" id="tokenGuide" aria-labelledby="guideTitle">
+    <div class="modal-head">
+      <h2 id="guideTitle">Create a GitHub token</h2>
+      <button type="button" class="modal-close" id="closeGuide" aria-label="Close">
+        <svg class="icon" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+          <path d="M4.25 4.25l7.5 7.5M11.75 4.25l-7.5 7.5" />
+        </svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <p class="modal-intro">
+        You need a <b>fine-grained</b> token scoped to just the repository you're syncing to.
+        It takes about a minute.
+      </p>
+      <ol class="steps">
+        <li>
+          Open <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noreferrer">github.com/settings/tokens</a>
+          and select <b>Fine-grained tokens</b> in the sidebar.
+        </li>
+        <li>Click <b>Generate new token</b>.</li>
+        <li>Under <b>Token name</b>, enter something you'll recognise later — e.g. <code>leetcode-sync</code>.</li>
+        <li>Add a <b>Description</b> if you like. This is optional and only for your own reference.</li>
+        <li>
+          Choose an <b>Expiration</b>. When it expires syncing stops working, and you'll need to
+          generate a new token and paste it in again.
+        </li>
+        <li>
+          Under <b>Repository access</b>, pick <b>Only select repositories</b> and select the
+          repository you want your solutions committed to.
+        </li>
+        <li>
+          Expand <b>Permissions → Repository permissions</b>, find <b>Contents</b>, and set it to
+          <b>Read and write</b>. That is the only permission this extension needs.
+        </li>
+        <li>Click <b>Generate token</b>, copy the value, and paste it into the token field.</li>
+      </ol>
+      <p class="modal-warn">
+        <svg class="icon" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+          <path d="M8 2.25 14.75 13.5H1.25L8 2.25Z" />
+          <path d="M8 6.5v3.1" />
+          <circle cx="8" cy="11.6" r=".55" style="fill: currentColor" />
+        </svg>
+        <span>GitHub shows the token only once. Copy it before you leave that page — if you lose it you'll have to generate another.</span>
+      </p>
+    </div>
+    <div class="modal-foot">
+      <a class="btn btn-primary" href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noreferrer">
+        Open GitHub token page
+      </a>
+      <button type="button" class="btn" id="closeGuideFoot">Close</button>
+    </div>
+  </dialog>
+
+  <div class="actions">
+    <button type="button" class="btn btn-primary" id="save">Save changes</button>
+    <button type="button" class="btn" id="test">Test connection</button>
+    <span id="status" role="status" aria-live="polite"></span>
+  </div>
+</div>
+
+<script src="options.js"></script>
+</body>
+</html>
