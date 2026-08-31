@@ -132,26 +132,190 @@
     return lastPending !== null || Object.keys(pending).length > 0;
   }
 
+  // ---------------------------------------------------------------------
+  // Editor access - shared by the submit-capture fallback below and by the
+  // "load a saved solution" path further down.
+  // ---------------------------------------------------------------------
+
+  // Monaco language ids mostly match LeetCode's own lang slugs, which is what
+  // EXT_MAP is keyed on. Only the ones that differ need listing; an empty
+  // string means "don't guess an extension from this".
+  const MONACO_LANG_ALIASES = {
+    shell: "bash",
+    plaintext: "",
+    abap: "",
+  };
+
+  function monacoEditorApi() {
+    const monaco = window.monaco;
+    return monaco && monaco.editor ? monaco.editor : null;
+  }
+
+  function modelLength(model) {
+    try {
+      if (typeof model.getValueLength === "function") return model.getValueLength();
+      return (model.getValue() || "").length;
+    } catch (e) {
+      return 0;
+    }
+  }
+
+  function modelOf(editor) {
+    try {
+      return editor.getModel() || null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function isVisible(editor) {
+    try {
+      const node = typeof editor.getDomNode === "function" ? editor.getDomNode() : null;
+      // offsetParent goes null for display:none and for detached nodes, which
+      // is what the spare editor LeetCode keeps around looks like.
+      return Boolean(node && node.offsetParent !== null);
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // Rank rather than filter, so we always end up with *some* candidate: a real
+  // problem page exposes two writable editors, the code one plus a hidden 0x0
+  // "plaintext" spare, and the spare must never win - not even when the user
+  // has emptied their buffer and both models have length zero.
+  function editorScore(editor) {
+    const model = modelOf(editor);
+    let score = 0;
+    if (isVisible(editor)) score += 4;
+    let lang = "";
+    try {
+      lang = model && typeof model.getLanguageId === "function" ? model.getLanguageId() : "";
+    } catch (e) {}
+    if (lang && lang !== "plaintext") score += 2;
+    return score;
+  }
+
+  // The problem page keeps several editors and models alive at once, and the
+  // submission views hold read-only ones, so prefer a live *writable* editor.
+  // getEditors() only exists on newer Monaco builds - callers fall back to the
+  // longest-model heuristic when it isn't there.
+  function pickEditor() {
+    const api = monacoEditorApi();
+    if (!api || typeof api.getEditors !== "function") return null;
+    try {
+      const editors = api.getEditors().filter((editor) => {
+        if (!modelOf(editor)) return false;
+        try {
+          const options = typeof editor.getRawOptions === "function" ? editor.getRawOptions() : {};
+          return !options.readOnly;
+        } catch (e) {
+          return false;
+        }
+      });
+      if (!editors.length) return null;
+      return editors.sort((a, b) => {
+        const byScore = editorScore(b) - editorScore(a);
+        if (byScore) return byScore;
+        // Tie-break on buffer size, matching the long-standing heuristic.
+        return modelLength(modelOf(b)) - modelLength(modelOf(a));
+      })[0];
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function longestModel() {
+    const api = monacoEditorApi();
+    if (!api || typeof api.getModels !== "function") return null;
+    try {
+      const models = api
+        .getModels()
+        .filter((m) => modelLength(m) > 0)
+        .sort((a, b) => modelLength(b) - modelLength(a));
+      return models[0] || null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // For *reading*, an empty editor is useless, so fall through to the longest
+  // model - that keeps the submit-capture fallback behaving as it always has.
+  function pickModel() {
+    const editor = pickEditor();
+    const fromEditor = editor ? modelOf(editor) : null;
+    if (fromEditor && modelLength(fromEditor) > 0) return fromEditor;
+    return longestModel() || fromEditor;
+  }
+
   // Last-resort source for the code, if the submit body couldn't be read.
   function codeFromEditor() {
+    const model = pickModel();
+    if (!model) return "";
     try {
-      const monaco = window.monaco;
-      if (monaco && monaco.editor && typeof monaco.editor.getModels === "function") {
-        const values = monaco.editor
-          .getModels()
-          .map((m) => {
-            try {
-              return m.getValue();
-            } catch (e) {
-              return "";
-            }
-          })
-          .filter(Boolean)
-          .sort((a, b) => b.length - a.length);
-        if (values.length) return values[0];
-      }
-    } catch (e) {}
-    return "";
+      return model.getValue() || "";
+    } catch (e) {
+      return "";
+    }
+  }
+
+  // LeetCode remembers the chosen editor language in localStorage under
+  // "global_lang" - a JSON-quoted string like "python3". That is its own lang
+  // slug, so it feeds EXT_MAP directly; the Monaco language id is rougher.
+  function langFromStorage() {
+    let raw;
+    try {
+      raw = window.localStorage.getItem("global_lang");
+    } catch (e) {
+      return "";
+    }
+    if (!raw) return "";
+    try {
+      const parsed = JSON.parse(raw);
+      return typeof parsed === "string" ? parsed : "";
+    } catch (e) {
+      // Not every LeetCode build stores it quoted.
+      return raw.replace(/^"+|"+$/g, "");
+    }
+  }
+
+  function langFromModel() {
+    const model = pickModel();
+    if (!model || typeof model.getLanguageId !== "function") return "";
+    let id;
+    try {
+      id = String(model.getLanguageId() || "").toLowerCase();
+    } catch (e) {
+      return "";
+    }
+    return id in MONACO_LANG_ALIASES ? MONACO_LANG_ALIASES[id] : id;
+  }
+
+  function currentLang() {
+    return langFromStorage() || langFromModel();
+  }
+
+  // Replace the whole buffer through the edit API - deliberately never
+  // model.setValue(), which throws the undo stack away. executeEdits between
+  // two undo stops means one Ctrl+Z puts back whatever was there before, and
+  // it fires onDidChangeModelContent so LeetCode's own editor state and
+  // autosave see the change exactly as if it had been typed.
+  function writeCode(code) {
+    const editor = pickEditor();
+    const model = editor ? modelOf(editor) : longestModel();
+    if (!model) throw new Error("Could not find the LeetCode code editor on this page.");
+
+    const range = model.getFullModelRange();
+    if (editor) {
+      editor.pushUndoStop();
+      editor.executeEdits("lc2gh", [{ range, text: code, forceMoveMarkers: true }]);
+      editor.pushUndoStop();
+      try {
+        editor.setPosition({ lineNumber: 1, column: 1 });
+        editor.revealLine(1);
+      } catch (e) {}
+    } else {
+      model.pushEditOperations([], [{ range, text: code }], () => null);
+    }
   }
 
   // ---------------------------------------------------------------------
@@ -315,6 +479,44 @@
       return origSend.apply(this, arguments);
     };
   }
+
+  // ---------------------------------------------------------------------
+  // Requests coming the other way, from content.js: reading the editor's
+  // current language and writing a saved solution into it. Replies are keyed
+  // by reqId so several requests can be in flight at once.
+  // ---------------------------------------------------------------------
+  window.addEventListener("message", (event) => {
+    if (event.source !== window) return;
+    const data = event.data;
+    if (!data || data.source !== "lc2gh-req" || !data.reqId) return;
+
+    let result;
+    try {
+      if (data.type === "GET_CONTEXT") {
+        const lang = currentLang();
+        result = {
+          ok: true,
+          lang,
+          ext: extFromLang(lang),
+          hasEditor: Boolean(pickEditor() || longestModel()),
+        };
+      } else if (data.type === "SET_CODE") {
+        const code = data.payload && data.payload.code;
+        if (typeof code !== "string" || !code) {
+          throw new Error("Nothing to write into the editor.");
+        }
+        writeCode(code);
+        result = { ok: true };
+      } else {
+        result = { ok: false, error: `Unknown request: ${data.type}` };
+      }
+    } catch (e) {
+      log("request failed", data.type, e);
+      result = { ok: false, error: String((e && e.message) || e) };
+    }
+
+    post("RESULT", Object.assign({ reqId: data.reqId }, result));
+  });
 
   // Let content.js know the MAIN-world hook is live, so it can skip its
   // <script>-tag fallback.

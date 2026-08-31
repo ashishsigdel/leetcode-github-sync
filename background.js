@@ -25,6 +25,24 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       });
     return true; // keep the message channel open for the async response
   }
+
+  if (message.type === "LC2GH_LIST_SOLUTIONS") {
+    listSolutions(message.payload && message.payload.slug)
+      .then((files) => sendResponse({ ok: true, files }))
+      .catch((err) => reportLoadError(err, sendResponse));
+    return true;
+  }
+
+  if (message.type === "LC2GH_FETCH_SOLUTION") {
+    const { slug, path } = message.payload || {};
+    fetchSolution(slug, path)
+      .then(async (file) => {
+        await pushLog(`Loaded ${file.path}`);
+        sendResponse({ ok: true, ...file });
+      })
+      .catch((err) => reportLoadError(err, sendResponse));
+    return true;
+  }
 });
 
 // Small rolling activity log so failures are visible in the popup instead of
@@ -56,9 +74,28 @@ async function getSettings() {
   };
 }
 
+// Every entry point needs the same three fields before it can talk to GitHub.
+async function requireSettings() {
+  const settings = await getSettings();
+  if (!settings.token || !settings.owner || !settings.repo) {
+    throw new Error(
+      "Not configured yet. Click the extension icon > Options and add your GitHub token, owner, and repo."
+    );
+  }
+  return settings;
+}
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 async function githubRequest(path, token, options = {}) {
   return fetch(`https://api.github.com${path}`, {
     ...options,
+    // The Contents API answers with "cache-control: public, max-age=60", so the
+    // browser cache will happily replay a stale blob SHA for a minute. Solving
+    // the same problem twice inside that window would then PUT an out-of-date
+    // sha and GitHub rejects it with 409 - and every retry would replay the
+    // same cached response, so it could never recover. Always hit the network.
+    cache: "no-store",
     headers: {
       Authorization: `Bearer ${token}`,
       Accept: "application/vnd.github+json",
@@ -89,9 +126,9 @@ function encodePath(path) {
 async function upsertFile({ owner, repo, branch, token, path, content, message }) {
   const apiPath = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${encodePath(path)}`;
 
-  // GitHub returns 409 when the branch tip moved between our GET and PUT
-  // (e.g. the code file and its README committed back to back).
-  for (let attempt = 0; attempt < 3; attempt++) {
+  // GitHub also returns 409 when the branch tip genuinely moved between our
+  // GET and PUT (e.g. the code file and its README committed back to back).
+  for (let attempt = 0; attempt < 4; attempt++) {
     const getRes = await githubRequest(`${apiPath}?ref=${encodeURIComponent(branch)}`, token);
 
     let sha;
@@ -114,7 +151,12 @@ async function upsertFile({ owner, repo, branch, token, path, content, message }
     });
 
     if (putRes.ok) return putRes.json();
-    if (putRes.status === 409 && attempt < 2) continue;
+    // Back off before re-reading: a write that has just landed can take a
+    // moment to be visible to the next read.
+    if (putRes.status === 409 && attempt < 3) {
+      await sleep(250 * 2 ** attempt);
+      continue;
+    }
 
     throw new Error(`GitHub PUT ${path} failed: ${putRes.status} ${await errorText(putRes)}`);
   }
@@ -144,13 +186,104 @@ function safeSegment(value, fallback) {
   return cleaned || fallback;
 }
 
-async function handleAccepted(payload) {
-  const { token, owner, repo, branch, includeReadme } = await getSettings();
-  if (!token || !owner || !repo) {
-    throw new Error(
-      "Not configured yet. Click the extension icon > Options and add your GitHub token, owner, and repo."
-    );
+// ---------------------------------------------------------------------------
+// Reading back: find and download a previously synced solution. content.js
+// asks for these by slug so the token never leaves this file.
+// ---------------------------------------------------------------------------
+
+function extOf(name) {
+  const dot = String(name || "").lastIndexOf(".");
+  return dot > 0 ? String(name).slice(dot + 1).toLowerCase() : "";
+}
+
+// Inverse of toBase64(). GitHub wraps its base64 at 60 columns, so strip
+// whitespace before decoding, and decode as UTF-8 rather than latin-1.
+function fromBase64(b64) {
+  const binary = atob(String(b64 || "").replace(/\s+/g, ""));
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new TextDecoder().decode(bytes);
+}
+
+// safeSegment() is what wrote the folder in the first place, so reuse it here
+// rather than trusting the slug the page handed us.
+function folderFor(slug) {
+  const folder = safeSegment(slug, "");
+  if (!folder) throw new Error("Could not work out the problem slug from the page.");
+  return folder;
+}
+
+async function listSolutions(slug) {
+  const { token, owner, repo, branch } = await requireSettings();
+  const folder = folderFor(slug);
+
+  const apiPath = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${encodePath(folder)}`;
+  const res = await githubRequest(`${apiPath}?ref=${encodeURIComponent(branch)}`, token);
+
+  // Nothing synced for this problem yet - an empty result, not a failure.
+  if (res.status === 404) return [];
+  if (!res.ok) {
+    throw new Error(`GitHub GET ${folder} failed: ${res.status} ${await errorText(res)}`);
   }
+
+  const json = await res.json();
+  // A non-array body means a file sits where we expected the problem folder.
+  if (!Array.isArray(json)) return [];
+
+  return json
+    .filter((entry) => entry && entry.type === "file" && entry.name.toLowerCase() !== "readme.md")
+    .map((entry) => ({ name: entry.name, path: entry.path, ext: extOf(entry.name) }));
+}
+
+async function fetchSolution(slug, path) {
+  const { token, owner, repo, branch } = await requireSettings();
+  const folder = folderFor(slug);
+
+  // The path comes from listSolutions(), but it round-trips through the page,
+  // so confine reads to the problem's own folder regardless of what came back.
+  if (!String(path || "").startsWith(`${folder}/`) || path.includes("..")) {
+    throw new Error("Refusing to read outside the problem's folder.");
+  }
+
+  const apiPath = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${encodePath(path)}`;
+  const res = await githubRequest(`${apiPath}?ref=${encodeURIComponent(branch)}`, token, {
+    // Raw skips the base64 envelope entirely, and with it the Contents API's
+    // 1 MB ceiling on base64-encoded responses.
+    headers: { Accept: "application/vnd.github.raw" },
+  });
+
+  if (res.status === 404) throw new Error(`${path} is no longer in the repository.`);
+  if (!res.ok) {
+    throw new Error(`GitHub GET ${path} failed: ${res.status} ${await errorText(res)}`);
+  }
+
+  // Some proxies drop the raw media type and hand back the JSON envelope.
+  const type = res.headers.get("content-type") || "";
+  let code;
+  if (/json/i.test(type)) {
+    const json = JSON.parse(await res.text());
+    code = json && json.content ? fromBase64(json.content) : "";
+  } else {
+    code = await res.text();
+  }
+
+  if (!code) throw new Error(`${path} is empty - nothing to load.`);
+
+  const name = path.slice(path.lastIndexOf("/") + 1);
+  return { code, name, path, ext: extOf(name) };
+}
+
+// A failed load is user-initiated and already reported in the page's own
+// toast, so unlike a failed commit it doesn't raise the error badge.
+async function reportLoadError(err, sendResponse) {
+  const detail = String(err && err.message ? err.message : err);
+  console.error("[LeetCode->GitHub]", err);
+  await pushLog(`Load failed: ${detail}`);
+  sendResponse({ ok: false, error: detail });
+}
+
+async function handleAccepted(payload) {
+  const { token, owner, repo, branch, includeReadme } = await requireSettings();
 
   const slug = safeSegment(payload && payload.slug, "");
   if (!slug) throw new Error("Could not work out the problem slug from the page.");

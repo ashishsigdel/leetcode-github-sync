@@ -191,6 +191,36 @@
     word-break: break-word;
   }
 
+  /* ---- Load into editor ---- */
+  .load { padding: 12px 14px; border-bottom: 1px solid var(--border); }
+  .load-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    padding: 7px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--canvas-subtle);
+    color: var(--fg);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.2;
+    cursor: pointer;
+  }
+  .load-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  .load-btn:active:not(:disabled) { background: var(--border-muted); }
+  .load-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .load-btn:disabled { cursor: default; opacity: .55; }
+  .load-meta { padding-left: 0; }
+  .load-meta.is-error { color: var(--danger); }
+  .load-meta .slug {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    color: var(--fg);
+  }
+
   /* ---- Activity section ---- */
   .section-head {
     display: flex;
@@ -340,6 +370,19 @@
       <div class="banner-text" id="bannerText"></div>
     </div>
   </div>
+
+  <section class="load">
+    <button type="button" class="load-btn" id="loadBtn" disabled>
+      <!-- download-into-editor arrow -->
+      <svg class="icon" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+        <path d="M8 2v8" />
+        <path d="M4.75 7.25 8 10.5l3.25-3.25" />
+        <path d="M2.75 12.75h10.5" />
+      </svg>
+      <span id="loadBtnLabel">Load solution into editor</span>
+    </button>
+    <p class="meta load-meta" id="loadMeta"></p>
+  </section>
 
   <div class="section-head">
     <span class="section-title">Activity</span>

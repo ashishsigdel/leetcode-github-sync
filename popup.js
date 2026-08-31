@@ -39,6 +39,12 @@ function classify(text) {
   m = /^Commit failed:\s*([\s\S]+)$/.exec(text);
   if (m) return { level: "error", label: "Commit failed", detail: m[1] };
 
+  m = /^Loaded\s+(.+)$/.exec(text);
+  if (m) return { level: "success", label: "Loaded into editor", detail: m[1], mono: true };
+
+  m = /^Load failed:\s*([\s\S]+)$/.exec(text);
+  if (m) return { level: "error", label: "Load failed", detail: m[1] };
+
   m = /^Submit detected:\s*(.+?)\s+—\s+but no code captured$/.exec(text);
   if (m) return { level: "warn", label: "No code captured", detail: m[1], mono: true };
 
@@ -189,6 +195,92 @@ async function render() {
   renderLog();
 }
 
+// ---- Load a saved solution into the active tab's editor --------------------
+// content.js owns the whole flow; the popup only picks the tab and triggers it,
+// so there is exactly one code path shared with the in-page button.
+
+const PROBLEM_URL_RE = /^https:\/\/(?:[a-z0-9-]+\.)?leetcode\.com\/problems\/([^/?#]+)/i;
+
+let loadTabId = null;
+
+function setLoadMeta(text, slug, isError) {
+  const el = document.getElementById("loadMeta");
+  el.textContent = "";
+  el.classList.toggle("is-error", Boolean(isError));
+  el.append(text);
+  if (slug) {
+    const mono = document.createElement("span");
+    mono.className = "slug";
+    mono.textContent = slug;
+    el.append(mono);
+  }
+}
+
+function sendToTab(tabId, message) {
+  return new Promise((resolve) => {
+    const unreachable = { ok: false, error: "Reload the LeetCode tab and try again." };
+    try {
+      chrome.tabs.sendMessage(tabId, message, (response) => {
+        if (chrome.runtime.lastError) {
+          resolve(unreachable);
+          return;
+        }
+        resolve(response || { ok: false, error: "No response from the LeetCode tab." });
+      });
+    } catch (e) {
+      resolve(unreachable);
+    }
+  });
+}
+
+async function initLoad() {
+  const { token, owner, repo } = await chrome.storage.local.get(["token", "owner", "repo"]);
+  if (!token || !owner || !repo) {
+    setLoadMeta("Add a GitHub token and repository first.", "");
+    return;
+  }
+
+  let tab = null;
+  try {
+    // tab.url is readable without the "tabs" permission because the manifest
+    // already holds host permissions for leetcode.com.
+    [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  } catch (e) {
+    tab = null;
+  }
+
+  const match = tab && tab.url ? PROBLEM_URL_RE.exec(tab.url) : null;
+  if (!match) {
+    setLoadMeta("Open a LeetCode problem to load a saved solution.", "");
+    return;
+  }
+
+  loadTabId = tab.id;
+  document.getElementById("loadBtn").disabled = false;
+  setLoadMeta("Problem: ", match[1]);
+}
+
+document.getElementById("loadBtn").addEventListener("click", async () => {
+  if (loadTabId == null) return;
+  const btn = document.getElementById("loadBtn");
+  const label = document.getElementById("loadBtnLabel");
+
+  btn.disabled = true;
+  label.textContent = "Loading…";
+  const result = await sendToTab(loadTabId, { type: "LC2GH_LOAD_REQUEST" });
+  label.textContent = "Load solution into editor";
+  btn.disabled = false;
+
+  if (!result.ok) {
+    setLoadMeta(result.error, "", true);
+  } else if (result.pending) {
+    setLoadMeta("Pick a language in the LeetCode tab.", "");
+  } else {
+    setLoadMeta("Loaded — switch to the LeetCode tab.", "");
+  }
+  render();
+});
+
 document.getElementById("openOptions").addEventListener("click", () => {
   chrome.runtime.openOptionsPage();
 });
@@ -209,3 +301,4 @@ for (const btn of document.querySelectorAll(".filter")) {
 }
 
 render();
+initLoad();
